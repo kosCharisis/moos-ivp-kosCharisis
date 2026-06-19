@@ -14,6 +14,7 @@ set MODE = ACTIVE {
 
 set MODE = STATION-KEEPING {
   MODE = ACTIVE
+  //DEPLOY = true
   STATION_KEEP = true
 }                       
 
@@ -31,6 +32,7 @@ set MODE = REFUELING {
   DEPLOY = true
   RETURN =false
   REFUEL_NEEDED = true
+  STATION_KEEP != true
  }
 
 set MODE = REFUELING_ACTIVE {
@@ -44,6 +46,7 @@ set MODE = TOURING {
   //MODE = ACTIVE
   RETURN != true
   REFUEL_NEEDED != true
+  STATION_KEEP != true
 } 
 
 //----------------------------------------------
@@ -107,7 +110,7 @@ Behavior = BHV_Waypoint
 Behavior = BHV_StationKeep
 {
   name      = station-keep
-  pwt       = 100
+  pwt       = 500
   condition = MODE==STATION-KEEPING
 
    center_activate = true
@@ -126,6 +129,8 @@ Behavior = BHV_StationKeep
   pwt       = 100
   
   condition = MODE==REFUELING_ACTIVE
+
+  duration = 60
 
    center_activate = true
       inner_radius = 5
@@ -161,7 +166,8 @@ Behavior = BHV_Timer
   condition = MODE==TOURING
   //condition  = DEPLOY = true
   //condition  = REFUEL_NEEDED = false
-  //// Pauses if the vehicle is station-keeping (no fuel used)
+  // Pauses if the vehicle is station-keeping (no fuel used)
+  //condition = RETURN = false
   //condition  = MODE != STATION-KEEPING 
   
   duration            = 600
