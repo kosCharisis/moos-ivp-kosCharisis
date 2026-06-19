@@ -1,0 +1,153 @@
+//--------    FILE: alpha.bhv   -------------
+
+initialize   DEPLOY = false
+initialize   RETURN = false
+initialize LOITER_REGION = west
+initialize WANT_SURFACE = false
+	
+//----------------------------------------------
+Behavior = BHV_Loiter
+{ 
+  name      = loiter_west
+  pwt       = 100
+  condition = RETURN = false
+  condition = DEPLOY = true
+  condition  = WANT_SURFACE = false // Go idle when surfacing is requested
+  condition = LOITER_REGION = west
+
+	duration   = 150                // Loiter for 150 seconds
+  duration_idle_decay = false
+  perpetual = true
+  endflag   = LOITER_REGION = east
+
+  speed      = 2.5                // Loiter speed 
+  clockwise  = false              // Loiter counter-clockwise [2]
+  polygon    = format=radial, x=100, y=-75, radius=30, pts=8
+  //visual_hints = nextpt_color=white, edge_color=blue
+}
+
+//----------------------------------------------
+Behavior = BHV_Loiter
+{ 
+  name      = loiter_east
+  pwt       = 100
+  condition = RETURN = false
+  condition = DEPLOY = true
+  condition  = WANT_SURFACE = false
+  condition = LOITER_REGION = east
+
+	duration   = 150                // Loiter for 150 seconds
+  duration_idle_decay = false
+  perpetual = true
+  endflag   = LOITER_REGION = west
+
+  speed      = 2.5                // Loiter speed 
+//  clockwise  = false              // Loiter counter-clockwise [2]
+  polygon    = format=radial, x=160, y=-50, radius=20, pts=8
+  //visual_hints = nextpt_color=white, edge_color=blue
+}
+
+//----------------------------------------------
+Behavior=BHV_Waypoint
+{
+  name      = waypt_return
+  pwt       = 100
+  condition = RETURN = true
+  condition = DEPLOY = true
+  updates = RETURN_UPDATES
+  perpetual = true
+  //updates   = RETURN_UPDATE
+  endflag   = RETURN = false
+  endflag   = DEPLOY = false
+  endflag   = MISSION = complete
+	
+           speed = 2.0
+  capture_radius = 2.0
+     slip_radius = 8.0
+          points = 0,0
+ }
+
+//----------------------------------------------
+Behavior=BHV_ConstantSpeed
+{
+  name      = const_speed
+  pwt       = 200
+  condition = SPD=true
+  condition = DEPLOY = true
+  perpetual = true
+  updates   = SPEED_UPDATE
+  endflag   = SPD = false
+
+           speed = 0.5
+		    duration = 10
+	duration_reset = CONST_SPD_RESET=true
+	
+}
+
+//----------------------------------------------
+Behavior = BHV_ConstantDepth
+{
+  name      = bhv_depth_west
+  pwt       = 100
+  condition = LOITER_REGION = west
+  condition = DEPLOY = true
+  
+  depth    = 30
+  duration = no-time-limit
+}
+
+//----------------------------------------------
+Behavior = BHV_ConstantDepth
+{
+  name      = bhv_depth_east
+  pwt       = 100
+  condition = LOITER_REGION = east
+  condition = DEPLOY = true
+  
+  depth    = 10
+  duration = no-time-limit
+}
+
+//----------------------------------------------
+Behavior = BHV_Timer
+{
+  name       = timer_surfacing_trigger
+  condition  = DEPLOY = true
+  condition  = WANT_SURFACE = false
+  duration   = 200
+  endflag    = WANT_SURFACE = true
+  perpetual  = true
+}
+
+//----------------------------------------------
+Behavior = BHV_Timer
+{
+  name       = timer_at_surface_wait
+  condition  = DEPLOY = true
+  condition  = WANT_SURFACE = true
+  condition  = NAV_DEPTH < 1.0       // Only start counting when at surface
+  duration   = 60
+  endflag    = WANT_SURFACE = false
+  perpetual  = true
+}
+
+//----------------------------------------------
+Behavior = BHV_ConstantDepth
+{
+  name      = bhv_surface_depth
+  pwt       = 500             // Higher than loiter depth weight
+  condition = WANT_SURFACE = true
+  depth     = 0
+  duration  = no-time-limit
+}
+
+//----------------------------------------------
+Behavior = BHV_ConstantSpeed
+{
+  name      = bhv_surface_stop
+  pwt       = 500
+  condition = WANT_SURFACE = true
+  condition = NAV_DEPTH < 1.0 // Only stop once you are actually there
+  speed     = 0
+  duration  = no-time-limit
+}
