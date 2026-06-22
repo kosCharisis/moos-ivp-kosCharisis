@@ -15,6 +15,14 @@
 #include "XYPoint.h"
 #include "XYPolygon.h"
 
+struct Swimmer
+{
+  std::string id;
+  double x;
+  double y;
+  bool found;
+};
+
 class GenRescue : public AppCastingMOOSApp
 {
  public:
@@ -40,11 +48,13 @@ class GenRescue : public AppCastingMOOSApp
   std::string m_vname;
   
  private: // State variables
+  std::map<std::string, Swimmer> m_swimmers;
   XYSegList  m_path;
   double     m_nav_x;
   double     m_nav_y;
   bool       m_nav_x_set;
-  bool       m_nav_y_set;    
+  bool       m_nav_y_set;
+  bool       m_plan_pending;
 };
 
 #endif 

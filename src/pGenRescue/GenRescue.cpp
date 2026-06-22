@@ -23,11 +23,11 @@ using namespace std;
 
 GenRescue::GenRescue()
 {
-  // Initialize state variables
   m_nav_x = 0;
   m_nav_y = 0;
-  m_nav_x_set = 0;
-  m_nav_y_set = 0;
+  m_nav_x_set = false;
+  m_nav_y_set = false;
+  m_plan_pending = false;
 }
 
 //---------------------------------------------------------
@@ -84,8 +84,10 @@ bool GenRescue::Iterate()
   AppCastingMOOSApp::Iterate();
   
   //if(m_plan_pending)
-  if((m_iteration % 20) == 0)
+  if(m_plan_pending && m_nav_x_set && m_nav_y_set) {
     postShortestPath();
+    m_plan_pending = false;
+  }
 
   AppCastingMOOSApp::PostReport();
   return(true);
@@ -122,6 +124,10 @@ void GenRescue::RegisterVariables()
   AppCastingMOOSApp::RegisterVariables();
   Register("SWIMMER_ALERT", 0);
   Register("FOUND_SWIMMER", 0);
+  
+  Register("NAV_X", 0);
+  Register("NAV_Y", 0);
+  
 }
 
 
@@ -130,14 +136,65 @@ void GenRescue::RegisterVariables()
 
 bool GenRescue::handleMailNewSwimmer(string str)
 {
+  string id = tokStringParse(str, "id", ',', '=');
+  double x  = tokDoubleParse(str, "x", ',', '=');
+  double y  = tokDoubleParse(str, "y", ',', '=');
+
+  if(id == "") {
+    reportRunWarning("SWIMMER_ALERT missing id: " + str);
+    return(false);
+  }
+
+  // Ignore repeated alerts for a swimmer we already know.
+  if(m_swimmers.count(id) > 0)
+    return(true);
+
+  Swimmer swimmer;
+  swimmer.id    = id;
+  swimmer.x     = x;
+  swimmer.y     = y;
+  swimmer.found = false;
+
+  m_swimmers[id] = swimmer;
+  m_plan_pending = true;
+
+  reportEvent("New swimmer received: id=" + id +
+              ", x=" + doubleToString(x, 1) +
+              ", y=" + doubleToString(y, 1));
+
   return(true);
 }
+
 
 //---------------------------------------------------------
 // Procedure: handleMailFoundSwimmer()
 
 bool GenRescue::handleMailFoundSwimmer(string str)
 {
+  string id = tokStringParse(str, "id", ',', '=');
+
+  if(id == "") {
+    reportRunWarning("FOUND_SWIMMER missing id: " + str);
+    return(false);
+  }
+
+  auto it = m_swimmers.find(id);
+
+  // It is possible to hear that a swimmer was found before
+  // receiving that swimmer's alert. Nothing useful to remove yet.
+  if(it == m_swimmers.end()) {
+    reportEvent("FOUND_SWIMMER received for unknown id=" + id);
+    return(true);
+  }
+
+  // Ignore duplicate FOUND_SWIMMER messages.
+  if(it->second.found)
+    return(true);
+
+  it->second.found = true;
+  m_plan_pending = true;
+
+  reportEvent("Swimmer removed from route: id=" + id);
   return(true);
 }
 
@@ -146,43 +203,34 @@ bool GenRescue::handleMailFoundSwimmer(string str)
 
 void GenRescue::postShortestPath()
 {
-  // If path has not been set, determine a random path of 9
-  // points, and make a greedy path from ownship start position.
-  // Once it has been set, don't change it. But keep posting it
-  // once every 20 iterations.
-  
-  if(m_path.size() == 0) {
-    XYFieldGenerator generator;
-    generator.addPolygon("-184,-5:-188, -14:-130,-44:-106,-3");
-    generator.addPolygon("-85,-3:-89,-8:-51,-1");
-    generator.addPolygon("-78,-74:-54,-32:-104,-53");
-    generator.setBufferDist(7);
-    generator.setMaxTries(1000);
-    generator.generatePoints(9);
-    
-    vector<XYPoint> pts = generator.getPoints();
-    
-    for(unsigned int i=0; i<pts.size(); i++) {
-      XYPoint pt = pts[i];
-      m_path.add_vertex(pt.x(), pt.y());
-    }
-    // Seglist needs a name, refer when drawging and erasing
-    m_path.set_label("one");    
-    XYSegList segl;
-    segl.add_vertex(m_nav_x, m_nav_y);
+  if(!m_nav_x_set || !m_nav_y_set)
+    return;
 
-    m_path = greedyPath(m_path, m_nav_x, m_nav_y);
-    
-    // Seglist needs a name, refer when drawging and erasing
-    segl.set_label("one");
+  XYSegList candidate_path;
+
+  for(const auto& entry : m_swimmers) {
+    const Swimmer& swimmer = entry.second;
+
+    if(!swimmer.found)
+      candidate_path.add_vertex(swimmer.x, swimmer.y);
   }
-  
+
+  // No active swimmers: send an empty/null route.
+  if(candidate_path.size() == 0) {
+    postNullPath();
+    return;
+  }
+
+  candidate_path.set_label("rescue_route");
+
+  m_path = greedyPath(candidate_path, m_nav_x, m_nav_y);
+  m_path.set_label("rescue_route");
+
   Notify("VIEW_SEGLIST", m_path.get_spec());
 
-  string update_var = "SURVEY_UPDATE";
   string update_str = "points = " + m_path.get_spec_pts();
 
-  Notify(update_var, update_str);
+  Notify("SURVEY_UPDATE", update_str);
   reportEvent("SURVEY_UPDATE=" + update_str);
 }
 
@@ -221,5 +269,29 @@ void GenRescue::postNullPath()
 
 bool GenRescue::buildReport()
 {
+  m_msgs << "Known swimmers: " << m_swimmers.size() << endl;
+
+  for(const auto& entry : m_swimmers) {
+    const Swimmer& swimmer = entry.second;
+
+    m_msgs << "  id=" << swimmer.id
+           << "  x=" << doubleToString(swimmer.x, 1)
+           << "  y=" << doubleToString(swimmer.y, 1)
+           << "  found=" << boolToString(swimmer.found)
+           << endl;
+  }
+
+  unsigned int active_count = 0;
+
+  for(const auto& entry : m_swimmers) {
+    if(!entry.second.found)
+      active_count++;
+  }
+
+  m_msgs << endl;
+  m_msgs << "Active swimmers: " << active_count << endl;
+  m_msgs << "Plan pending:    " << boolToString(m_plan_pending) << endl;
+
+  
   return(true);
 }
