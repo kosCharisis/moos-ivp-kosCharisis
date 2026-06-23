@@ -15,6 +15,7 @@
 #include "XYPoint.h"
 #include "XYPolygon.h"
 
+
 struct Swimmer
 {
   std::string id;
@@ -40,6 +41,7 @@ class GenRescue : public AppCastingMOOSApp
  protected:
   bool handleMailNewSwimmer(std::string);
   bool handleMailFoundSwimmer(std::string);
+  bool handleMailNodeReport(std::string);
   bool handleMailRescueRegion(std::string);
   void postShortestPath();
   void postNullPath();
@@ -50,11 +52,22 @@ class GenRescue : public AppCastingMOOSApp
  private: // State variables
   std::map<std::string, Swimmer> m_swimmers;
   XYSegList  m_path;
+  
   double     m_nav_x;
   double     m_nav_y;
   bool       m_nav_x_set;
   bool       m_nav_y_set;
+  
+  double     m_enemy_x;
+  double     m_enemy_y;
+  bool       m_enemy_report_set;
+  std::string m_enemy_name;
+  
   bool       m_plan_pending;
 };
 
 #endif 
+
+
+
+
