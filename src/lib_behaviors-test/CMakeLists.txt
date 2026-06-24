@@ -23,9 +23,9 @@ MACRO(ADD_BHV BHV_NAME)
     ivpbuild 
     logic 
     ivpcore 
+    geometry
     bhvutil 
-    mbutil 
-    geometry 
+    mbutil
     ${SYSTEM_LIBS} )
 ENDMACRO(ADD_BHV)
 
@@ -42,6 +42,25 @@ TARGET_LINK_LIBRARIES(BHV_SimpleWaypoint
    logic 
    ivpcore 
    bhvutil 
-   mbutil 
    geometry 
+   mbutil 
+   
+   ${SYSTEM_LIBS} )
+
+
+#--------------------------------------------------------
+#                                      BHV_Pulse
+#--------------------------------------------------------
+ADD_LIBRARY(BHV_Pulse SHARED 
+   BHV_Pulse.cpp AOF_SimpleWaypoint.cpp)
+TARGET_LINK_LIBRARIES(BHV_Pulse
+   helmivp
+   behaviors 
+   ivpbuild 
+   logic 
+   ivpcore 
+   bhvutil 
+   geometry 
+   mbutil 
+   
    ${SYSTEM_LIBS} )
